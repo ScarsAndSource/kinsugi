@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta content="width=device-width, initial-scale=1.0" name="viewport">
+  <meta content="web_standard" name="shell-type">
+  <title>Kintsugi — A Game of Vanishing Floors</title>
+  
+  <!-- Typography & Icons -->
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..800;1,400..800&amp;family=JetBrains+Mono:wght@300;400;500;600&amp;family=Noto+Serif:wght@300;400&amp;display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  
+  <style>
+    @layer base {
+      html, body { margin: 0; padding: 0; }
+      body { overscroll-behavior: none; }
+      main > :first-child { margin-top: 0 !important; }
+      main > :last-child { margin-bottom: 0 !important; }
+    }
+    ::-webkit-scrollbar { display: none; }
+    .bg-radial-gradient {
+      background: radial-gradient(circle at 50% 20%, rgba(33, 31, 30, 0.5) 0%, rgba(14, 13, 12, 0.98) 75%);
+    }
+    .kintsugi-noise {
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
+    }
+  </style>
+
+  <!-- Tailwind CSS & Theme Config -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "on-tertiary-container": "#372700",
+            "surface-container-lowest": "#0f0e0d",
+            "primary-fixed-dim": "#ffb5a0",
+            "on-error-container": "#ffdad6",
+            "surface-container-high": "#2b2a28",
+            "surface-bright": "#3b3937",
+            "error-container": "#93000a",
+            "on-background": "#e6e1df",
+            "on-error": "#690005",
+            "outline": "#a88a82",
+            "on-surface-variant": "#e1bfb6",
+            "on-secondary-fixed": "#002018",
+            "secondary-fixed-dim": "#9bd2bf",
+            "on-secondary-container": "#8dc3b1",
+            "secondary-container": "#1b5243",
+            "on-primary-fixed": "#3b0900",
+            "on-tertiary": "#402d00",
+            "primary-fixed": "#ffdbd1",
+            "inverse-on-surface": "#32302f",
+            "primary": "#ffb5a0",
+            "tertiary": "#ebc166",
+            "secondary-fixed": "#b6eeda",
+            "on-secondary": "#00382c",
+            "background": "#141312",
+            "on-primary-fixed-variant": "#872100",
+            "tertiary-container": "#b08b37",
+            "surface-tint": "#ffb5a0",
+            "surface-variant": "#363433",
+            "on-primary": "#601400",
+            "tertiary-fixed": "#ffdf9e",
+            "secondary": "#9bd2bf",
+            "surface-container-low": "#1d1b1a",
+            "on-secondary-fixed-variant": "#184f41",
+            "on-tertiary-fixed-variant": "#5b4300",
+            "surface": "#141312",
+            "surface-container": "#211f1e",
+            "error": "#ffb4ab",
+            "on-tertiary-fixed": "#261a00",
+            "surface-container-highest": "#363433",
+            "tertiary-fixed-dim": "#ebc166",
+            "surface-dim": "#141312",
+            "inverse-surface": "#e6e1df",
+            "outline-variant": "#59413b",
+            "on-primary-container": "#541100",
+            "on-surface": "#e6e1df",
+            "inverse-primary": "#ae3108",
+            "primary-container": "#f36238"
+          },
+          borderRadius: {
+            DEFAULT: "0.25rem",
+            lg: "0.5rem",
+            xl: "0.75rem",
+            full: "9999px"
+          },
+          spacing: {
+            "space-lg": "1.75rem",
+            "space-sm": "0.5rem",
+            "space-md": "1rem",
+            "gutter-mobile": "0.75rem",
+            "margin": "3rem",
+            "gutter": "1.5rem",
+            "margin-mobile": "1.25rem",
+            "space-xl": "3rem",
+            "space-xs": "0.25rem"
+          },
+          fontFamily: {
+            "kanji-accent": ["Noto Serif", "serif"],
+            "headline-lg": ["EB Garamond", "serif"],
+            "body-default": ["JetBrains Mono", "monospace"],
+            "data-mono": ["JetBrains Mono", "monospace"],
+            "label-caps": ["JetBrains Mono", "monospace"],
+            "display-hero": ["EB Garamond", "serif"],
+            "display-hero-mobile": ["EB Garamond", "serif"],
+            "headline-sm": ["EB Garamond", "serif"],
+            "title-editorial": ["EB Garamond", "serif"],
+            "headline-lg-mobile": ["EB Garamond", "serif"]
+          },
+          fontSize: {
+            "kanji-accent": ["1.5rem", { lineHeight: "2rem", letterSpacing: "0.3em", fontWeight: "300" }],
+            "headline-lg": ["2.5rem", { lineHeight: "2.75rem", letterSpacing: "-0.01em", fontWeight: "400" }],
+            "body-default": ["0.875rem", { lineHeight: "1.5rem", letterSpacing: "-0.01em", fontWeight: "400" }],
+            "data-mono": ["0.75rem", { lineHeight: "1.25rem", letterSpacing: "0.04em", fontWeight: "400" }],
+            "label-caps": ["0.6875rem", { lineHeight: "1rem", letterSpacing: "0.15em", fontWeight: "500" }],
+            "display-hero": ["4.5rem", { lineHeight: "4.5rem", letterSpacing: "-0.02em", fontWeight: "400" }],
+            "display-hero-mobile": ["2.75rem", { lineHeight: "3rem", letterSpacing: "-0.01em", fontWeight: "400" }],
+            "headline-sm": ["1.25rem", { lineHeight: "1.5rem", letterSpacing: "0.02em", fontWeight: "500" }],
+            "title-editorial": ["1.125rem", { lineHeight: "1.5rem", letterSpacing: "0.08em", fontWeight: "400" }],
+            "headline-lg-mobile": ["1.75rem", { lineHeight: "2rem", letterSpacing: "0em", fontWeight: "400" }]
+          }
+        }
+      }
+    };
+  </script>
+</head>
+
+<body class="bg-surface font-body-default text-body-default text-on-surface antialiased bg-radial-gradient min-h-screen relative selection:bg-tertiary-container selection:text-on-tertiary-container">
+  <!-- Subtle Grain Noise Overlay -->
+  <div class="pointer-events-none fixed inset-0 z-50 kintsugi-noise opacity-40"></div>
+
+  <!-- Header -->
+  <header class="fixed top-0 w-full z-40 bg-surface/85 backdrop-blur-md shadow-[0_1px_8px_rgba(0,0,0,0.35)]">
+    <div class="h-16 w-full px-margin-mobile lg:px-margin flex items-center justify-between">
+      
+      <!-- Logo Branding -->
+      <div class="flex items-center gap-space-md cursor-pointer" onclick="navigate('ritual')">
+        <div class="flex items-baseline gap-space-xs">
+          <span class="font-title-editorial text-title-editorial text-on-surface tracking-widest font-normal">KINTSUGI</span>
+          <span class="font-kanji-accent text-data-mono text-tertiary opacity-90 pl-space-xs">金継ぎ</span>
+        </div>
+        <div class="hidden md:block w-px h-3.5 bg-outline-variant/30"></div>
+        <span class="hidden md:inline font-data-mono text-data-mono text-on-surface-variant/60 tracking-wider lowercase">a game of vanishing floors</span>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="hidden lg:flex items-center gap-space-lg" data-active-classes="bg-primary-container text-on-primary-container font-label-caps text-label-caps px-space-sm py-1 rounded">
+        <a aria-current="page" class="tracking-widest transition-colors bg-primary-container text-on-primary-container font-label-caps text-label-caps px-space-sm py-1 rounded" data-path="ritual" href="#">01 RITUAL</a>
+        <a class="font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface tracking-widest transition-colors" data-path="board" href="#">02 THE BOARD</a>
+        <a class="font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface tracking-widest transition-colors" data-path="workshop" href="#">03 WORKSHOP</a>
+        <a class="font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface tracking-widest transition-colors" data-path="posterity" href="#">04 POSTERITY</a>
+      </nav>
+
+      <!-- System Controls & Sync Pill -->
+      <div class="flex items-center gap-space-md">
+        <div class="flex items-center gap-space-sm text-on-surface-variant">
+          <button class="flex items-center justify-center p-1.5 rounded hover:bg-surface-container-high hover:text-on-surface transition-colors" title="Soundscape Ritual" type="button">
+            <span class="material-symbols-outlined text-[18px]">volume_down</span>
+          </button>
+          <button class="flex items-center justify-center p-1.5 rounded hover:bg-surface-container-high hover:text-on-surface transition-colors" title="Ambient Drift" type="button">
+            <span class="material-symbols-outlined text-[18px]">air</span>
+          </button>
+          <div class="flex items-center gap-1.5 px-space-xs py-0.5 rounded bg-surface-container-lowest" id="sync-pill">
+            <span class="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse" id="sync-dot"></span>
+            <span class="hidden sm:inline font-data-mono text-data-mono text-secondary tracking-widest" id="sync-label">SYNC</span>
+          </div>
+        </div>
+        <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-[0_0_12px_rgba(243,98,56,0.18)]">
+          <span class="material-symbols-outlined text-on-primary text-[18px]">person</span>
+        </div>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Dynamic Page Root -->
+  <main class="w-full pt-16 bg-transparent relative z-10" id="app">
+    <!-- Screen content injected by app.js router -->
+  </main>
+
+  <!-- Editorial Zen Footer -->
+  <footer class="w-full bg-surface-container-lowest relative z-10 py-space-xl mt-space-xl border-t border-outline-variant/10">
+    <div class="w-full px-margin-mobile lg:px-margin flex flex-col md:flex-row items-start md:items-center justify-between gap-space-md">
+      <div class="flex flex-col gap-space-xs">
+        <div class="flex items-center gap-space-xs">
+          <span class="font-title-editorial text-title-editorial text-on-surface">KINTSUGI</span>
+          <span class="font-kanji-accent text-data-mono text-tertiary">破片</span>
+        </div>
+        <p class="font-data-mono text-data-mono text-on-surface-variant/60 tracking-wider max-w-sm">
+          Basalt arena telemetry and erosion protocol. Every turn dissolves stone; every fracture holds memory.
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-space-lg">
+        <div class="flex items-center gap-space-xs">
+          <span class="font-data-mono text-data-mono text-on-surface-variant/40">EPOCH:</span>
+          <span class="font-data-mono text-data-mono text-tertiary">4.82.01</span>
+        </div>
+        <div class="flex items-center gap-space-xs">
+          <span class="font-data-mono text-data-mono text-on-surface-variant/40">FLOOR:</span>
+          <span class="font-data-mono text-data-mono text-secondary">64/64 RESIDUAL</span>
+        </div>
+        <div class="flex items-center gap-space-xs">
+          <span class="font-data-mono text-data-mono text-on-surface-variant/40">ENGINE:</span>
+          <span class="font-data-mono text-data-mono text-primary">FASTAPI REST</span>
+        </div>
+      </div>
+      <div class="font-data-mono text-data-mono text-on-surface-variant/40 tracking-widest uppercase">
+        © MMXXIV VANISHING FLOORS
+      </div>
+    </div>
+  </footer>
+
+  <!-- Application Modules -->
+  <script src="js/api.js"></script>
+  <script src="js/ritual.js"></script>
+  <script src="js/board.js"></script>
+  <script src="js/workshop.js"></script>
+  <script src="js/posterity.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -7,10 +7,12 @@ Docs: http://localhost:8000/docs
 """
 from __future__ import annotations
 
+import os
 from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from arena import play_game, round_robin
@@ -203,3 +205,10 @@ def api_duel(req: DuelReq) -> Dict[str, Any]:
         {"heuristic": req.b, "depth": req.depth_b},
     )
     return {"a_is_player": 0, "b_is_player": 1, **game}
+
+
+# Mount frontend static assets if available
+frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend"))
+if os.path.isdir(frontend_dir):
+    app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
+
