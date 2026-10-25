@@ -16,12 +16,13 @@ function posterityRender() {
   const humanStrides = history.filter(h => h.player === 0).length || Math.ceil(movesPlayed / 2);
   const machineStrides = history.filter(h => h.player === 1).length || Math.floor(movesPlayed / 2);
 
-  const totalNodes = p.stats?.totalNodes || 684120;
-  const avgDepth = p.stats?.avgDepth || (p.config?.depth || 6.8);
+  const hasStats = !!p.stats && p.stats.totalNodes > 0;
+  const totalNodes = hasStats ? p.stats.totalNodes : 0;
+  const avgDepth = p.stats?.avgDepth ?? (p.config?.depth ?? 0);
   const cutoffs = p.stats?.totalCutoffs || 0;
-  const pruneEfficiency = totalNodes > 0 && cutoffs > 0 
+  const pruneEfficiency = hasStats && cutoffs > 0
     ? ((cutoffs / (totalNodes + cutoffs)) * 100).toFixed(1) + '%'
-    : '94.2%';
+    : 'n/a';
 
   const heroHeadline = isHumanWinner ? "You outlasted it." : "The machine endures.";
   const heroQuote = isHumanWinner
@@ -243,7 +244,6 @@ function posterityRender() {
         <span class="font-kanji-accent text-kanji-accent text-tertiary">碑</span>
         <div class="flex flex-col">
           <span class="font-label-caps text-label-caps text-on-surface">ARCHIVAL CARTRIDGE STORED</span>
-          <span class="font-data-mono text-data-mono text-on-surface-variant/60" id="cartridge-hash">SHA256: 9e88b3901a0e883df1e27a9c...gold.kintsugi</span>
         </div>
       </div>
       <div class="flex items-center gap-space-md">
@@ -337,8 +337,8 @@ function _posterityTilesHTML(p, n) {
 
 function _posteritySvgPaths(p, n) {
   // Convert square indices to [cx, cy] on a 700x700 canvas
-  const padding = 50;
-  const usable = 600;
+  const padding = 14;
+  const usable = 672;
   const cellSize = usable / n;
 
   function sqToCenter(sq) {
@@ -410,17 +410,6 @@ function _posteritySvgPaths(p, n) {
 
 // ─── Actions ───────────────────────────────────────────────────────────────
 function posterityInit() {
-  // Auto-generate deterministic cartridge hash if needed
-  const el = document.getElementById('cartridge-hash');
-  if (el) {
-    const raw = (K.posterity?.matchRef || '849-URN') + (K.posterity?.history?.length || 42);
-    let h = 0x811c9dc5;
-    for (let i = 0; i < raw.length; i++) {
-      h ^= raw.charCodeAt(i);
-      h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
-    }
-    el.textContent = `SHA256: ${(h >>> 0).toString(16).padStart(8, '0')}1a0e883df1e27a9c...gold.kintsugi`;
-  }
 }
 
 function posterityReplayTimelapse() {
@@ -473,5 +462,9 @@ function posterityExportSVG() {
 }
 
 function posterityInscribeLedger() {
-  alert('Ritual relic sealed and permanently inscribed to local browser cold storage.');
+  const blob = new Blob([JSON.stringify(K.posterity, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'kintsugi-match.json';
+  a.click();
 }

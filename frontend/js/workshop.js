@@ -163,7 +163,7 @@ async function workshopRunCompare() {
 
   try {
     // Generate standard test state
-    const initState = K.game.view?.state || {
+    const initState = (K.game.view && !K.game.view.game_over && K.game.view.state) || K.game.initialView?.state || {
       n: 7,
       blocked: [10, 38],
       pos: [45, 3],

@@ -145,6 +145,7 @@ function boardInit() {
   }
 
   // Keyboard shortcuts
+  if (window._boardKeyHandler) window.removeEventListener('keydown', window._boardKeyHandler);
   window._boardKeyHandler = e => {
     if (e.key === 't' || e.key === 'T') boardToggleCamera();
     if (e.key === 'k' || e.key === 'K') boardToggleKingdoms();
@@ -609,17 +610,21 @@ async function boardDoAiMove() {
   boardRefreshStatus();
 
   try {
+    // backend rejects minimax deeper than 7, so clamp instead of soft-locking
+    const depth = K.config.algorithm === 'minimax' ? Math.min(K.config.depth, 7) : K.config.depth;
+
     const result = await API.ai({
       state:        K.game.view.state,
       algorithm:    K.config.algorithm,
       heuristic:    K.config.heuristic,
-      depth:        K.config.depth,
+      depth,
       ordering:     K.config.ordering ? 'heuristic' : 'none',
       iterative:    K.config.iterative,
       time_limit_ms: K.config.timeLimitMs,
       trace_depth:  K.config.traceDepth,
     });
 
+    K.game._aiRetries = 0;
     const afterView = result.view;
     K.game.aiResult = result;
     K.game.history.push({
@@ -631,11 +636,12 @@ async function boardDoAiMove() {
       aiResult:  result,
     });
 
-    // Update score badge
     const badge = document.getElementById('score-label');
     if (badge) {
       const s = result.score;
       badge.textContent = `WEIGHT: ${s >= 0 ? '+' : ''}${s.toFixed(2)}`;
+      badge.style.cursor = '';
+      badge.onclick = null;
     }
 
     K.game.view = afterView;
@@ -649,6 +655,22 @@ async function boardDoAiMove() {
     console.error('AI move failed:', e);
     K.game.isAiThinking = false;
     boardRefreshAll();
+
+    // cold start / network blip: retry twice automatically
+    K.game._aiRetries = (K.game._aiRetries || 0) + 1;
+    if (K.game._aiRetries <= 2 && K.game.view && !K.game.view.game_over) {
+      setTimeout(boardDoAiMove, 2000 * K.game._aiRetries);
+      return;
+    }
+
+    // otherwise show the fault and let the player click to retry (no dead end)
+    K.game._aiRetries = 0;
+    const badge = document.getElementById('score-label');
+    if (badge) {
+      badge.textContent = `MACHINE FAULT: ${e.message} — CLICK TO RETRY`;
+      badge.style.cursor = 'pointer';
+      badge.onclick = () => { badge.onclick = null; boardDoAiMove(); };
+    }
   }
 }
 
