@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -207,8 +208,17 @@ def api_duel(req: DuelReq) -> Dict[str, Any]:
     return {"a_is_player": 0, "b_is_player": 1, **game}
 
 
-# Mount frontend static assets if available
-frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend"))
-if os.path.isdir(frontend_dir):
-    app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
+# Local dev: serve the frontend from ./public (or ../frontend).
+# On Vercel the CDN serves public/ itself, so no mount there.
+_here = os.path.dirname(os.path.abspath(__file__))
+if not os.getenv("VERCEL"):
+    for _cand in (os.path.join(_here, "public"), os.path.join(_here, "..", "frontend")):
+        if os.path.isdir(_cand):
+            app.mount("/", StaticFiles(directory=os.path.abspath(_cand), html=True), name="frontend")
+            break
+else:
+    # belt-and-braces in case "/" isn't resolved to public/index.html by the CDN
+    @app.get("/", include_in_schema=False)
+    def _root():
+        return RedirectResponse("/index.html")
 
