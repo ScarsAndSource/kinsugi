@@ -1,9 +1,12 @@
 """
-main.py - FastAPI server. Stateless: the client sends the full game state with
-every request, so replays, undo and time-travel in the UI are trivial.
+main.py - FastAPI server for Kintsugi (Knight Isolation).
 
-Run:  uvicorn main:app --reload --port 8000
-Docs: http://localhost:8000/docs
+Stateless: the browser sends the full game state with every request, so undo,
+hints and replays need no server memory (which is exactly what Vercel wants).
+
+Local:   uvicorn main:app --reload --port 8000     then open http://localhost:8000
+Docs:    /docs
+Vercel:  public/ is served by the CDN; this file only has to expose `app`.
 """
 from __future__ import annotations
 
@@ -21,10 +24,10 @@ from engine import State, new_game
 from heuristics import HEURISTICS, territory
 from search import compare_algorithms, search
 
-app = FastAPI(title="Kintsugi - Isolation engine", version="1.0")
+app = FastAPI(title="Kintsugi - Isolation engine", version="2.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-MAX_MINIMAX_DEPTH = 7
+MAX_MINIMAX_DEPTH = 7      # plain minimax explodes beyond this in pure Python
 MAX_ALPHABETA_DEPTH = 10
 
 
@@ -37,7 +40,7 @@ def parse_state(raw: Dict[str, Any]) -> State:
 
 
 def view(state: State) -> Dict[str, Any]:
-    """Everything the UI needs to draw a position."""
+    """Everything the UI needs to draw one position."""
     t = territory(state)
     winner = state.winner()
     return {
@@ -48,8 +51,8 @@ def view(state: State) -> Dict[str, Any]:
         "free_squares": state.free_squares(),
         "winner": winner,
         "game_over": winner is not None,
-        # owner: -1 destroyed/occupied, 0 / 1 = that player reaches it first, 2 = unreachable
-        "territory": {"owner": t["owner"], "counts": t["counts"], "dist": t["dist"]},
+        # owner[sq]: -1 destroyed/occupied | 0 human reaches first | 1 machine reaches first | 2 neither
+        "territory": {"owner": t["owner"], "counts": t["counts"]},
     }
 
 
@@ -61,9 +64,9 @@ def check_heuristic(key: str) -> None:
 # ---------------------------------------------------------------- schemas
 class NewGameReq(BaseModel):
     n: int = Field(7, ge=5, le=8)
-    holes: int = Field(0, ge=0, le=8, description="pairs of pre-destroyed squares (symmetric)")
+    holes: int = Field(0, ge=0, le=8, description="pairs of pre-broken tiles (placed symmetrically)")
     seed: Optional[int] = None
-    first: int = Field(0, ge=0, le=1, description="0 = human/bottom moves first, 1 = AI/top")
+    first: int = Field(0, ge=0, le=1, description="0 = human moves first, 1 = machine")
 
 
 class MoveReq(BaseModel):
@@ -79,7 +82,7 @@ class AIReq(BaseModel):
     ordering: Literal["none", "heuristic"] = "heuristic"
     iterative: bool = True
     time_limit_ms: Optional[int] = Field(3000, ge=50, le=30000)
-    trace_depth: int = Field(2, ge=0, le=3)
+    trace_depth: int = Field(0, ge=0, le=3)
 
 
 class CompareReq(BaseModel):
@@ -100,8 +103,8 @@ class TournamentReq(BaseModel):
 class DuelReq(BaseModel):
     a: str = "territory"
     b: str = "mobility"
-    depth_a: int = Field(4, ge=1, le=6)
-    depth_b: int = Field(4, ge=1, le=6)
+    depth_a: int = Field(3, ge=1, le=6)
+    depth_b: int = Field(3, ge=1, le=6)
     n: int = Field(7, ge=5, le=8)
     holes: int = Field(2, ge=0, le=6)
     seed: int = 1
@@ -125,7 +128,7 @@ def api_new(req: NewGameReq) -> Dict[str, Any]:
 
 @app.post("/api/analyze")
 def api_analyze(body: Dict[str, Any]) -> Dict[str, Any]:
-    """Re-derive the view (legal moves, territory) for any state, e.g. while scrubbing a replay."""
+    """Re-derive the view (legal moves, territory) for any state."""
     return view(parse_state(body["state"] if "state" in body else body))
 
 
@@ -144,18 +147,21 @@ def api_move(req: MoveReq) -> Dict[str, Any]:
 
 @app.post("/api/ai")
 def api_ai(req: AIReq) -> Dict[str, Any]:
+    """Best move for whoever is to move in `state` (also used for hints)."""
     state = parse_state(req.state)
     check_heuristic(req.heuristic)
     if state.winner() is not None:
         raise HTTPException(status_code=409, detail="game is already over")
-    if req.algorithm == "minimax" and req.depth > MAX_MINIMAX_DEPTH:
-        raise HTTPException(status_code=422, detail=f"minimax depth is capped at {MAX_MINIMAX_DEPTH}")
+
+    depth = req.depth
+    if req.algorithm == "minimax" and depth > MAX_MINIMAX_DEPTH:
+        depth = MAX_MINIMAX_DEPTH  # clamp instead of failing, so a game can never dead-end
 
     res = search(
         state,
         algorithm=req.algorithm,
         heuristic=req.heuristic,
-        depth=req.depth,
+        depth=depth,
         ordering=req.ordering,
         iterative=req.iterative,
         time_limit_ms=req.time_limit_ms,
@@ -166,9 +172,12 @@ def api_ai(req: AIReq) -> Dict[str, Any]:
     return {
         "move": {"player": state.turn, "from": frm, "to": res["move"]},
         "score": res["score"],
+        "depth_requested": req.depth,
+        "depth_used": depth,
         "depth_completed": res["depth_completed"],
         "algorithm": res["algorithm"],
         "heuristic": res["heuristic"],
+        "ordering": res["ordering"],
         "stats": res["stats"],
         "root_moves": res["root_moves"],
         "tree": res["tree"],
@@ -197,7 +206,7 @@ def api_tournament(req: TournamentReq) -> Dict[str, Any]:
 
 @app.post("/api/lab/duel")
 def api_duel(req: DuelReq) -> Dict[str, Any]:
-    """One AI-vs-AI game, returned move by move so the UI can replay it as a time-lapse."""
+    """One AI-vs-AI game, move by move (not used by the current UI, handy for /docs and reports)."""
     check_heuristic(req.a)
     check_heuristic(req.b)
     game = play_game(
@@ -208,17 +217,16 @@ def api_duel(req: DuelReq) -> Dict[str, Any]:
     return {"a_is_player": 0, "b_is_player": 1, **game}
 
 
-# Local dev: serve the frontend from ./public (or ../frontend).
-# On Vercel the CDN serves public/ itself, so no mount there.
+# ---------------------------------------------------------------- frontend
+# On Vercel the CDN serves public/ by itself. Locally we serve it from here.
 _here = os.path.dirname(os.path.abspath(__file__))
-if not os.getenv("VERCEL"):
-    for _cand in (os.path.join(_here, "public"), os.path.join(_here, "..", "frontend")):
+
+if os.getenv("VERCEL"):
+    @app.get("/", include_in_schema=False)
+    def _root() -> RedirectResponse:
+        return RedirectResponse("/index.html")
+else:
+    for _cand in (os.path.join(_here, "public"), os.path.join(_here, "frontend"), os.path.join(_here, "..", "frontend")):
         if os.path.isdir(_cand):
             app.mount("/", StaticFiles(directory=os.path.abspath(_cand), html=True), name="frontend")
             break
-else:
-    # belt-and-braces in case "/" isn't resolved to public/index.html by the CDN
-    @app.get("/", include_in_schema=False)
-    def _root():
-        return RedirectResponse("/index.html")
-
